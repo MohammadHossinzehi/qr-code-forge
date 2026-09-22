@@ -1,0 +1,24 @@
+{
+  "name": "qr-code-forge",
+  "version": "1.0.0",
+  "description": "A from-scratch QR code encoder and decoder: GF(256) Reed-Solomon error correction, ISO/IEC 18004 module placement and masking, verified against OpenCV's independent QR reader.",
+  "main": "src/qrcode.js",
+  "bin": {
+    "qr-code-forge": "bin/cli.js"
+  },
+  "scripts": {
+    "test": "node --test test/test.js"
+  },
+  "keywords": [
+    "qrcode",
+    "reed-solomon",
+    "error-correction",
+    "gf256",
+    "barcode",
+    "iso18004"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  }
+}
