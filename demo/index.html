@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>qr-code-forge — live demo</title>
+<style>
+  :root {
+    color-scheme: light;
+    --ink: #1a1a1a;
+    --muted: #666;
+    --bg: #fafafa;
+    --panel: #ffffff;
+    --accent: #2563eb;
+    --border: #e2e2e2;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    padding: 2rem 1rem 4rem;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+  p.lead { color: var(--muted); margin-top: 0; }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+  }
+  @media (max-width: 720px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.25rem;
+  }
+  label { display: block; font-size: 0.85rem; font-weight: 600; margin: 0.75rem 0 0.25rem; }
+  textarea, select, input[type=text] {
+    width: 100%;
+    font-size: 0.95rem;
+    padding: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: inherit;
+  }
+  textarea { resize: vertical; min-height: 4rem; }
+  .row { display: flex; gap: 0.75rem; align-items: center; }
+  .row > * { flex: 1; }
+  button {
+    margin-top: 1rem;
+    padding: 0.55rem 1rem;
+    border-radius: 6px;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: white;
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+  button.secondary {
+    background: white;
+    color: var(--accent);
+  }
+  #qrHolder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 260px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  #qrHolder svg { max-width: 100%; height: auto; }
+  .meta { font-size: 0.85rem; color: var(--muted); margin-top: 0.75rem; line-height: 1.5; }
+  .meta b { color: var(--ink); }
+  pre#decodedOut {
+    background: #f4f4f4;
+    border-radius: 6px;
+    padding: 0.75rem;
+    font-size: 0.85rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin-top: 0.75rem;
+  }
+  .error { color: #b91c1c; }
+  .ok { color: #15803d; }
+  footer { margin-top: 2rem; font-size: 0.8rem; color: var(--muted); text-align: center; }
+  footer a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>qr-code-forge</h1>
+  <p class="lead">A QR code encoder and decoder built from scratch — GF(256) Reed-Solomon, ISO/IEC 18004 module placement, all running client-side in this page.</p>
+
+  <div class="grid">
+    <div class="panel">
+      <label for="text">Text to encode</label>
+      <textarea id="text">https://github.com/MohammadHossinzehi</textarea>
+
+      <div class="row">
+        <div>
+          <label for="ec">Error correction level</label>
+          <select id="ec">
+            <option value="L">L — recovers ~7% of damaged modules</option>
+            <option value="M" selected>M — recovers ~15%</option>
+            <option value="Q">Q — recovers ~25%</option>
+            <option value="H">H — recovers ~30%</option>
+          </select>
+        </div>
+      </div>
+
+      <button id="encodeBtn">Encode</button>
+      <button id="corruptBtn" class="secondary">Corrupt random modules &amp; re-decode</button>
+
+      <div class="meta" id="meta"></div>
+    </div>
+
+    <div class="panel">
+      <div id="qrHolder"></div>
+      <div class="meta">Decoded by this library's own decoder (not a photo scanner) — reading the modules back, correcting any simulated damage, and reassembling the text.</div>
+      <pre id="decodedOut">Encode something to see it decoded here.</pre>
+    </div>
+  </div>
+
+  <footer>
+    Everything on this page runs from <code>demo/qrcode.bundle.js</code>, a plain concatenation of the CommonJS
+    modules in <code>/src</code> (see <code>tools/build-bundle.js</code>). No dependencies, no build step.
+  </footer>
+</div>
+
+<script src="qrcode.bundle.js"></script>
+<script>
+(function () {
+  const textEl = document.getElementById('text');
+  const ecEl = document.getElementById('ec');
+  const metaEl = document.getElementById('meta');
+  const holder = document.getElementById('qrHolder');
+  const decodedOut = document.getElementById('decodedOut');
+
+  let currentSymbol = null;
+
+  function encodeAndRender() {
+    const text = textEl.value;
+    const ecLevel = ecEl.value;
+    try {
+      const sym = QRCodeForge.encode(text, { ecLevel });
+      currentSymbol = sym;
+      holder.innerHTML = QRCodeForgeRender.toSVG(sym, { scale: 8, margin: 3 });
+      metaEl.innerHTML =
+        `<b>Version:</b> ${sym.version} &nbsp; <b>EC level:</b> ${sym.ecLevel} &nbsp; ` +
+        `<b>Mask:</b> ${sym.mask} &nbsp; <b>Size:</b> ${sym.size}×${sym.size} modules`;
+      const result = QRCodeForge.decode(sym);
+      decodedOut.textContent = JSON.stringify(result, null, 2);
+      decodedOut.className = 'ok';
+    } catch (e) {
+      holder.innerHTML = '';
+      metaEl.textContent = '';
+      decodedOut.textContent = 'Error: ' + e.message;
+      decodedOut.className = 'error';
+      currentSymbol = null;
+    }
+  }
+
+  function corruptAndRedecode() {
+    if (!currentSymbol) return;
+    const sym = currentSymbol;
+    const modules = sym.modules.map((row) => row.slice());
+    const numFlips = 1 + Math.floor(Math.random() * 6);
+    for (let i = 0; i < numFlips; i++) {
+      const r = Math.floor(Math.random() * sym.size);
+      const c = Math.floor(Math.random() * sym.size);
+      modules[r][c] ^= 1;
+    }
+    holder.innerHTML = QRCodeForgeRender.toSVG({ size: sym.size, modules }, { scale: 8, margin: 3 });
+    try {
+      const result = QRCodeForge.decode({ size: sym.size, modules });
+      decodedOut.textContent =
+        `Flipped ${numFlips} random module(s).\n\n` + JSON.stringify(result, null, 2);
+      decodedOut.className = result.text === textEl.value ? 'ok' : 'error';
+    } catch (e) {
+      decodedOut.textContent = `Flipped ${numFlips} random module(s).\n\nDecode failed: ${e.message}\n(too much damage for this EC level — try a higher EC level)`;
+      decodedOut.className = 'error';
+    }
+  }
+
+  document.getElementById('encodeBtn').addEventListener('click', encodeAndRender);
+  document.getElementById('corruptBtn').addEventListener('click', corruptAndRedecode);
+  textEl.addEventListener('input', encodeAndRender);
+  ecEl.addEventListener('change', encodeAndRender);
+
+  encodeAndRender();
+})();
+</script>
+</body>
+</html>
